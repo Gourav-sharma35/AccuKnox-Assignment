@@ -1,0 +1,256 @@
+Problem Statement 1:
+Title: Containerisation and Deployment of Wisecow Application on Kubernetes
+Project Repository: https://github.com/nyrahul/wisecow Wisecow App
+Objective: To containerize and deploy the Wisecow application, hosted in the above-mentioned GitHub repository, on a Kubernetes environment with secure TLS communication.
+Requirements:
+Dockerization:
+● Develop a Dockerfile for creating a container image of the Wisecow application.
+Kubernetes Deployment:
+● Craft Kubernetes manifest files for deploying the Wisecow application in a Kubernetes environment.
+
+● The Wisecow app must be exposed as a Kubernetes service for accessibility.
+Continuous Integration and Deployment (CI/CD):
+● Implement a GitHub Actions workflow for:
+● Automating the build and push of the Docker image to a container registry whenever changes are committed to the repository.
+● Continuous Deployment [Challenge Goal]: Automatically
+deploy the updated application to the Kubernetes environment
+following successful image builds.
+TLS Implementation [Challenge Goal]:
+● Ensure that the Wisecow application supports secure TLS communication.
+Expected Artifacts:
+● A private GitHub repository containing:
+● The Wisecow application source code.
+● The Dockerfile for the application.
+
+● Kubernetes manifest files for deployment.
+● The CI/CD pipeline configuration.
+● A GitHub Actions workflow file for facilitating Continuous Build and Deployment (CI/CD)
+
+Access Control:
+● The GitHub repository should be set to public.
+
+End Goal: The successful containerisation and deployment of the Wisecow application to the Kubernetes environment with an automated CI/CD pipeline and secured with TLS communication.
+
+
+Solution :
+
+1. Dockerization
+Dockerfile: Create a Dockerfile to build the Wisecow application into a container image.
+
+# Use a base image suitable for your application
+FROM node:14-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the port your app runs on
+EXPOSE 3000
+
+# Command to run the application
+CMD ["npm", "start"]
+
+2. Kubernetes Deployment
+Manifest Files: Craft Kubernetes manifest files (deployment.yaml, service.yaml, ingress.yaml for TLS) to deploy Wisecow on Kubernetes.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wisecow-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wisecow
+  template:
+    metadata:
+      labels:
+        app: wisecow
+    spec:
+      containers:
+        - name: wisecow
+          image: your-registry/wisecow-app:latest
+          ports:
+            - containerPort: 3000
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: wisecow-service
+spec:
+  selector:
+    app: wisecow
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+
+3. Continuous Integration and Deployment (CI/CD) with GitHub Actions
+GitHub Actions Workflow: Implement a workflow for automating Docker image build and deployment to Kubernetes.
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t your-registry/wisecow-app:latest .
+          docker push your-registry/wisecow-app:latest
+
+      - name: Deploy to Kubernetes
+        uses: azure/k8s-deploy@v1
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+          images: your-registry/wisecow-app:latest
+          manifests: |
+            manifests/deployment.yaml
+            manifests/service.yaml
+
+4. TLS Implementation
+To implement TLS, you typically use Kubernetes Ingress with a TLS secret.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wisecow-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  tls:
+    - hosts:
+        - your.domain.com
+      secretName: tls-secret  # Replace with your TLS secret
+  rules:
+    - host: your.domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wisecow-service
+                port:
+                  number: 80
+
+Additional Considerations
+Secrets Management: Use Kubernetes Secrets for sensitive data like TLS certificates.
+Security: Ensure your Docker image and Kubernetes configurations follow best practices for security.
+Monitoring: Implement monitoring and logging for the application and Kubernetes cluster.
+
+
+Problem Statement 2:
+Please choose any two objectives from the list below and attempt to achieve them using either Bash or Python.
+
+1. System Health Monitoring Script:
+Develop a script that monitors the health of a Linux system. It should check CPU usage, memory usage, disk space, and running processes. If any of these metrics exceed predefined thresholds (e.g., CPU usage > 80%), the script should send an alert to the console or a log file.
+
+Solution :
+
+# Define thresholds (adjust these as per our requirements)
+CPU_THRESHOLD=80
+MEMORY_THRESHOLD=80
+DISK_THRESHOLD=80
+
+# Function to check CPU usage
+check_cpu_usage() {
+    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+    if [ $(echo "$cpu_usage > $CPU_THRESHOLD" | bc) -eq 1 ]; then
+        echo "CPU usage is high: $cpu_usage%" >> /var/log/system_health.log
+    fi
+}
+
+# Function to check memory usage
+check_memory_usage() {
+    local memory_usage=$(free | grep Mem | awk '{print $3/$2 * 100}')
+    if [ $(echo "$memory_usage > $MEMORY_THRESHOLD" | bc) -eq 1 ]; then
+        echo "Memory usage is high: $memory_usage%" >> /var/log/system_health.log
+    fi
+}
+
+# Function to check disk space
+check_disk_space() {
+    local disk_usage=$(df --output=pcent / | tail -n 1 | sed 's/%//')
+    if [ $disk_usage -gt $DISK_THRESHOLD ]; then
+        echo "Disk usage is high: $disk_usage%" >> /var/log/system_health.log
+    fi
+}
+
+# Function to check number of running processes
+check_running_processes() {
+    local num_processes=$(ps -e | wc -l)
+    local max_processes=500  # Adjust as needed
+    if [ $num_processes -gt $max_processes ]; then
+        echo "Number of running processes is high: $num_processes" >> /var/log/system_health.log
+    fi
+}
+
+# Main function to check all metrics
+main() {
+    check_cpu_usage
+    check_memory_usage
+    check_disk_space
+    check_running_processes
+}
+
+# Execute the main function
+main
+
+
+2. Automated Backup Solution:
+Write a script to automate the backup of a specified directory to a remote server or a cloud storage solution. The script should provide a report on the success or failure of the backup operation.
+
+#!/bin/bash
+
+# Configuration variables
+SOURCE_DIR="/path/to/source/directory"  # Replace with your source directory
+REMOTE_USER="username"                  # Replace with your remote server username
+REMOTE_HOST="remote-server-ip"          # Replace with your remote server IP or hostname
+REMOTE_DIR="/path/to/remote/directory"  # Replace with your remote directory
+LOG_FILE="/var/log/backup.log"          # Log file path
+
+# Function to perform the backup
+perform_backup() {
+    echo "Starting backup at $(date)" >> "$LOG_FILE"
+    rsync -avz --delete "$SOURCE_DIR" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR" >> "$LOG_FILE" 2>&1
+
+    if [ $? -eq 0 ]; then
+        echo "Backup successful at $(date)" >> "$LOG_FILE"
+        echo "Backup successful"
+    else
+        echo "Backup failed at $(date)" >> "$LOG_FILE"
+        echo "Backup failed"
+    fi
+}
+
+# Main function
+main() {
+    perform_backup
+}
+
+# Execute main function
+main
+
